@@ -1,7 +1,7 @@
 <div align="center">
   <img src="tai-e-logo.png" height="200">
 
-# Tai-e
+# Tai-e 
 
 [![test](https://github.com/pascal-lab/Tai-e/actions/workflows/test.yml/badge.svg)](https://github.com/pascal-lab/Tai-e/actions/workflows/test.yml)
 [![java](https://img.shields.io/badge/Java-17-informational)](https://openjdk.java.net/)
