@@ -25,7 +25,7 @@ jobs:
         run: ./gradlew checkstyleMain checkstyleTest
         continue-on-error: true
 
-      - name: Comment Checkstyle Results on PR (with Debug)
+      - name: Comment Checkstyle Results on PR
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -33,45 +33,26 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             const { execSync } = require('child_process');
+            const { JSDOM } = require('jsdom');
 
-            console.log('=== Starting Checkstyle Results Processing ===');
-            console.log('Current working directory:', process.cwd());
-            console.log('GitHub context:', {
-              repo: context.repo,
-              issue_number: context.issue.number,
-              pr_head_sha: context.payload.pull_request?.head?.sha
-            });
+            console.log('Starting Checkstyle Results Processing');
 
             // Find all checkstyle XML files
             let xmlFiles = [];
             try {
               const findResult = execSync("find . -path '*/build/reports/checkstyle/*.xml' -type f", { encoding: 'utf-8' });
-              console.log('Find command raw output:', findResult);
               xmlFiles = findResult
                 .trim()
                 .split('\n')
                 .filter(f => f);
-              console.log('Found XML files:', xmlFiles);
+              console.log(`Found ${xmlFiles.length} checkstyle XML files`);
             } catch (e) {
               console.error('Error finding XML files:', e.message);
-              console.log('Trying alternative find command...');
-              try {
-                const altFindResult = execSync("find . -name '*checkstyle*.xml' -type f", { encoding: 'utf-8' });
-                console.log('Alternative find result:', altFindResult);
-              } catch (e2) {
-                console.error('Alternative find also failed:', e2.message);
-              }
+              return;
             }
 
             if (xmlFiles.length === 0) {
-              console.log('No checkstyle XML files found!');
-              console.log('Checking if gradle task actually generated reports...');
-              try {
-                const gradleCheck = execSync("ls -la ./build/reports/ 2>/dev/null || echo 'No build/reports directory'", { encoding: 'utf-8' });
-                console.log('Gradle reports directory:', gradleCheck);
-              } catch (e) {
-                console.error('Could not check gradle reports:', e.message);
-              }
+              console.log('No checkstyle XML files found');
               return;
             }
 
@@ -81,7 +62,7 @@ jobs:
             let failedComments = 0;
 
             for (const xmlFile of xmlFiles) {
-              console.log(`\n=== Processing file: ${xmlFile} ===`);
+              console.log(`Processing: ${xmlFile}`);
 
               if (!fs.existsSync(xmlFile)) {
                 console.log(`File does not exist: ${xmlFile}`);
@@ -89,79 +70,93 @@ jobs:
               }
 
               const content = fs.readFileSync(xmlFile, 'utf-8');
-              console.log(`File size: ${content.length} bytes`);
-              console.log('First 200 chars:', content.substring(0, 200));
+              const dom = new JSDOM(content, { contentType: 'text/xml' });
+              const document = dom.window.document;
 
-              // Check if content is valid XML
-              if (!content.includes('<?xml')) {
-                console.log('Warning: File does not appear to be valid XML');
-              }
+              // Get all file elements
+              const fileElements = document.querySelectorAll('file');
 
-              // Simple XML parsing with regex
-              const fileMatches = Array.from(content.matchAll(/<file name="([^"]+)">([\s\S]*?)<\/file>/g));
-              console.log(`Found ${fileMatches.length} file entries`);
+              for (const fileElement of fileElements) {
+                const fullFileName = fileElement.getAttribute('name');
+                if (!fullFileName) continue;
 
-              for (const fileMatch of fileMatches) {
-                const fullFileName = fileMatch[1];
-                const fileName = fullFileName.replace(process.cwd() + '/', '');
-                const fileContent = fileMatch[2];
+                // Make path relative to repository root
+                const fileName = fullFileName
+                  .replace(process.cwd() + '/', '')
+                  .replace(/^\//, '');
 
-                console.log(`\n  Processing file entry: ${fileName}`);
-                console.log(`  Full path was: ${fullFileName}`);
+                // Get all error elements within this file
+                const errorElements = fileElement.querySelectorAll('error');
 
-                const errorMatches = Array.from(fileContent.matchAll(/<error line="(\d+)"[^>]*source="([^"]+)"[^>]*message="([^"]+)"/g));
-                console.log(`  Found ${errorMatches.length} errors`);
+                if (errorElements.length > 0) {
+                  console.log(`  File: ${fileName} (${errorElements.length} errors)`);
+                }
 
-                for (const errorMatch of errorMatches) {
+                for (const errorElement of errorElements) {
+                  const line = errorElement.getAttribute('line');
+                  const column = errorElement.getAttribute('column');
+                  const message = errorElement.getAttribute('message');
+                  const source = errorElement.getAttribute('source');
+                  const severity = errorElement.getAttribute('severity');
+
+                  if (!line || !message || !source) {
+                    console.log('    Skipping error due to missing attributes');
+                    continue;
+                  }
+
                   hasErrors = true;
                   totalErrors++;
 
-                  const line = parseInt(errorMatch[1]);
-                  const source = errorMatch[2];
-                  const message = errorMatch[3];
+                  const lineNum = parseInt(line);
 
                   // Extract just the check class name
                   const checkName = source.split('.').pop();
 
-                  console.log(`    Error at line ${line}: ${checkName} - ${message.substring(0, 50)}...`);
-
                   // Create the comment body
                   const body = `⚠️ **[checkstyle]** <${checkName}> ${message}`;
 
+                  console.log(`    Line ${lineNum}: ${checkName}`);
+
                   try {
-                    console.log(`    Attempting to post comment on ${fileName}:${line}`);
-                    const comment = await github.rest.pulls.createReviewComment({
+                    await github.rest.pulls.createReviewComment({
                       owner: context.repo.owner,
                       repo: context.repo.repo,
                       pull_number: context.issue.number,
                       body: body,
                       path: fileName,
-                      line: line,
+                      line: lineNum,
                       side: 'RIGHT',
                       commit_id: context.payload.pull_request.head.sha
                     });
-                    console.log(`    ✓ Comment posted successfully (ID: ${comment.data.id})`);
                     successfulComments++;
+                    console.log(`    ✓ Comment posted`);
                   } catch (e) {
-                    console.log(`    ✗ Could not post comment: ${e.message}`);
-                    if (e.response) {
-                      console.log(`    Response status: ${e.response.status}`);
-                      console.log(`    Response data:`, JSON.stringify(e.response.data, null, 2));
-                    }
                     failedComments++;
+                    console.log(`    ✗ Failed: ${e.message}`);
+
+                    // If line not in diff, post as general comment
+                    if (e.status === 422) {
+                      try {
+                        await github.rest.issues.createComment({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          issue_number: context.issue.number,
+                          body: `${body}\n\n📍 File: \`${fileName}\` Line: ${lineNum}`
+                        });
+                        console.log(`    ✓ Posted as PR comment`);
+                        successfulComments++;
+                        failedComments--;
+                      } catch (e2) {
+                        console.log(`    ✗ PR comment also failed: ${e2.message}`);
+                      }
+                    }
                   }
                 }
               }
             }
 
-            console.log('\n=== Summary ===');
-            console.log(`Total errors found: ${totalErrors}`);
-            console.log(`Successful comments: ${successfulComments}`);
-            console.log(`Failed comments: ${failedComments}`);
+            console.log(`\nSummary: ${totalErrors} errors, ${successfulComments} posted, ${failedComments} failed`);
 
             if (hasErrors) {
-              console.log('Setting build status to FAILED due to checkstyle violations');
-              core.setFailed('Checkstyle violations found');
-            } else {
-              console.log('No checkstyle violations found - build passing');
+              core.setFailed(`Checkstyle found ${totalErrors} violation(s)`);
             }
