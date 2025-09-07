@@ -25,8 +25,8 @@ jobs:
         run: ./gradlew checkstyleMain checkstyleTest
         continue-on-error: true
 
-      - name: Comment Checkstyle Results on PR
-        uses: actions/github-script@v8
+      - name: Comment Checkstyle Results on PR (with Debug)
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -34,30 +34,88 @@ jobs:
             const path = require('path');
             const { execSync } = require('child_process');
 
+            console.log('=== Starting Checkstyle Results Processing ===');
+            console.log('Current working directory:', process.cwd());
+            console.log('GitHub context:', {
+              repo: context.repo,
+              issue_number: context.issue.number,
+              pr_head_sha: context.payload.pull_request?.head?.sha
+            });
+
             // Find all checkstyle XML files
-            const xmlFiles = execSync("find . -path '*/build/reports/checkstyle/*.xml' -type f", { encoding: 'utf-8' })
-              .trim()
-              .split('\n')
-              .filter(f => f);
+            let xmlFiles = [];
+            try {
+              const findResult = execSync("find . -path '*/build/reports/checkstyle/*.xml' -type f", { encoding: 'utf-8' });
+              console.log('Find command raw output:', findResult);
+              xmlFiles = findResult
+                .trim()
+                .split('\n')
+                .filter(f => f);
+              console.log('Found XML files:', xmlFiles);
+            } catch (e) {
+              console.error('Error finding XML files:', e.message);
+              console.log('Trying alternative find command...');
+              try {
+                const altFindResult = execSync("find . -name '*checkstyle*.xml' -type f", { encoding: 'utf-8' });
+                console.log('Alternative find result:', altFindResult);
+              } catch (e2) {
+                console.error('Alternative find also failed:', e2.message);
+              }
+            }
+
+            if (xmlFiles.length === 0) {
+              console.log('No checkstyle XML files found!');
+              console.log('Checking if gradle task actually generated reports...');
+              try {
+                const gradleCheck = execSync("ls -la ./build/reports/ 2>/dev/null || echo 'No build/reports directory'", { encoding: 'utf-8' });
+                console.log('Gradle reports directory:', gradleCheck);
+              } catch (e) {
+                console.error('Could not check gradle reports:', e.message);
+              }
+              return;
+            }
 
             let hasErrors = false;
+            let totalErrors = 0;
+            let successfulComments = 0;
+            let failedComments = 0;
 
             for (const xmlFile of xmlFiles) {
-              if (!fs.existsSync(xmlFile)) continue;
+              console.log(`\n=== Processing file: ${xmlFile} ===`);
+
+              if (!fs.existsSync(xmlFile)) {
+                console.log(`File does not exist: ${xmlFile}`);
+                continue;
+              }
 
               const content = fs.readFileSync(xmlFile, 'utf-8');
+              console.log(`File size: ${content.length} bytes`);
+              console.log('First 200 chars:', content.substring(0, 200));
+
+              // Check if content is valid XML
+              if (!content.includes('<?xml')) {
+                console.log('Warning: File does not appear to be valid XML');
+              }
 
               // Simple XML parsing with regex
-              const fileMatches = content.matchAll(/<file name="([^"]+)">([\s\S]*?)<\/file>/g);
+              const fileMatches = Array.from(content.matchAll(/<file name="([^"]+)">([\s\S]*?)<\/file>/g));
+              console.log(`Found ${fileMatches.length} file entries`);
 
               for (const fileMatch of fileMatches) {
-                const fileName = fileMatch[1].replace(process.cwd() + '/', '');
+                const fullFileName = fileMatch[1];
+                const fileName = fullFileName.replace(process.cwd() + '/', '');
                 const fileContent = fileMatch[2];
 
-                const errorMatches = fileContent.matchAll(/<error line="(\d+)"[^>]*source="([^"]+)"[^>]*message="([^"]+)"/g);
+                console.log(`\n  Processing file entry: ${fileName}`);
+                console.log(`  Full path was: ${fullFileName}`);
+
+                const errorMatches = Array.from(fileContent.matchAll(/<error line="(\d+)"[^>]*source="([^"]+)"[^>]*message="([^"]+)"/g));
+                console.log(`  Found ${errorMatches.length} errors`);
 
                 for (const errorMatch of errorMatches) {
                   hasErrors = true;
+                  totalErrors++;
+
                   const line = parseInt(errorMatch[1]);
                   const source = errorMatch[2];
                   const message = errorMatch[3];
@@ -65,11 +123,14 @@ jobs:
                   // Extract just the check class name
                   const checkName = source.split('.').pop();
 
+                  console.log(`    Error at line ${line}: ${checkName} - ${message.substring(0, 50)}...`);
+
                   // Create the comment body
-                  const body = `⚠️ **[checkstyle]**: ${message} (corresponding rule is ${checkName})`;
+                  const body = `⚠️ **[checkstyle]** <${checkName}> ${message}`;
 
                   try {
-                    await github.rest.pulls.createReviewComment({
+                    console.log(`    Attempting to post comment on ${fileName}:${line}`);
+                    const comment = await github.rest.pulls.createReviewComment({
                       owner: context.repo.owner,
                       repo: context.repo.repo,
                       pull_number: context.issue.number,
@@ -79,13 +140,28 @@ jobs:
                       side: 'RIGHT',
                       commit_id: context.payload.pull_request.head.sha
                     });
+                    console.log(`    ✓ Comment posted successfully (ID: ${comment.data.id})`);
+                    successfulComments++;
                   } catch (e) {
-                    console.log(`Could not post comment on ${fileName}:${line}: ${e.message}`);
+                    console.log(`    ✗ Could not post comment: ${e.message}`);
+                    if (e.response) {
+                      console.log(`    Response status: ${e.response.status}`);
+                      console.log(`    Response data:`, JSON.stringify(e.response.data, null, 2));
+                    }
+                    failedComments++;
                   }
                 }
               }
             }
 
+            console.log('\n=== Summary ===');
+            console.log(`Total errors found: ${totalErrors}`);
+            console.log(`Successful comments: ${successfulComments}`);
+            console.log(`Failed comments: ${failedComments}`);
+
             if (hasErrors) {
+              console.log('Setting build status to FAILED due to checkstyle violations');
               core.setFailed('Checkstyle violations found');
+            } else {
+              console.log('No checkstyle violations found - build passing');
             }
