@@ -55,10 +55,10 @@ public class PointerAnalysis extends ProgramAnalysis<PointerAnalysisResult> {
         String advanced = options.getString("advanced");
         String cs = options.getString("cs");
         if (advanced != null) {
-            if (advanced.equals("collection")) {
+            if (advanced.equals("collection"))
                 selector = ContextSelectorFactory.makeSelectiveSelector(cs,
                         new CollectionMethods(World.get().getClassHierarchy()).get());
-            } else {
+            else {
                 // run context-insensitive analysis as pre-analysis
                 PointerAnalysisResult preResult = runAnalysis(heapModel,
                         ContextSelectorFactory.makeCISelector());
