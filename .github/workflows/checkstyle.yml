@@ -25,137 +25,239 @@ jobs:
         run: ./gradlew checkstyleMain checkstyleTest
         continue-on-error: true
 
-      - name: Install dependencies
-        run: npm install xml2js glob
+      - name: Install xml2js
+        run: npm install xml2js
 
-      - name: Parse Checkstyle Reports and Comment on PR
+      - name: Parse Checkstyle Reports and Comment
         uses: actions/github-script@v8
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const path = require('path');
             const xml2js = require('xml2js');
-            const glob = require('glob');
-            const util = require('util');
+
+            console.log('🔍 Starting Checkstyle report analysis...');
+
+            // 使用 @actions/glob 查找所有 checkstyle XML 报告文件
+            const globber = await glob.create('**/build/reports/checkstyle/*.xml');
+            const reportFiles = await globber.glob();
+
+            console.log(`📁 Found ${reportFiles.length} checkstyle report files:`);
+            reportFiles.forEach(file => console.log(`  - ${file}`));
+
+            if (reportFiles.length === 0) {
+              console.log('⚠️ No checkstyle report files found');
+              return;
+            }
 
             const parser = new xml2js.Parser();
-            const parseXml = util.promisify(parser.parseString);
-            const globPromise = util.promisify(glob);
+            let totalViolations = 0;
+            const allViolations = [];
 
-            async function run() {
-              console.log('Starting to process checkstyle reports...');
+            // 解析每个 XML 文件
+            for (const reportFile of reportFiles) {
+              console.log(`\n📄 Processing file: ${reportFile}`);
 
-              // Find all checkstyle XML reports
-              const reportPaths = await globPromise('**/build/reports/checkstyle/*.xml');
-              console.log(`Found ${reportPaths.length} checkstyle report files: ${reportPaths.join(', ')}`);
+              try {
+                const xmlContent = fs.readFileSync(reportFile, 'utf8');
+                console.log(`📝 XML content length: ${xmlContent.length} characters`);
 
-              if (reportPaths.length === 0) {
-                console.log('No checkstyle reports found.');
-                return;
-              }
+                const result = await parser.parseStringPromise(xmlContent);
+                console.log(`🔍 Parsed XML structure:`, JSON.stringify(result, null, 2));
 
-              let violationsCount = 0;
-              const prSha = context.payload.pull_request.head.sha;
-              console.log(`PR SHA: ${prSha}`);
+                if (!result.checkstyle || !result.checkstyle.file) {
+                  console.log('⚠️ No files found in checkstyle report');
+                  continue;
+                }
 
-              for (const reportPath of reportPaths) {
-                console.log(`Processing report: ${reportPath}`);
-                try {
-                  const xmlContent = fs.readFileSync(reportPath, 'utf8');
-                  console.log(`XML content loaded, length: ${xmlContent.length} bytes`);
+                const files = Array.isArray(result.checkstyle.file) ? result.checkstyle.file : [result.checkstyle.file];
+                console.log(`📂 Processing ${files.length} files in report`);
 
-                  const result = await parseXml(xmlContent);
-                  console.log('XML parsed successfully');
-                  console.log(`Parsed structure: ${JSON.stringify(result, null, 2)}`);
+                for (const file of files) {
+                  const fileName = file.$.name;
+                  console.log(`\n🔎 Analyzing file: ${fileName}`);
 
-                  if (!result.checkstyle || !result.checkstyle.file) {
-                    console.log('No violations found in this report or invalid format.');
+                  if (!file.error) {
+                    console.log('✅ No errors found in this file');
                     continue;
                   }
 
-                  for (const file of result.checkstyle.file) {
-                    const fileName = file.$.name; // Get the file name from attributes
-                    console.log(`Processing file: ${fileName}`);
+                  const errors = Array.isArray(file.error) ? file.error : [file.error];
+                  console.log(`❌ Found ${errors.length} errors in ${fileName}`);
 
-                    // Skip if no errors
-                    if (!file.error || file.error.length === 0) {
-                      console.log(`No errors in file: ${fileName}`);
-                      continue;
-                    }
+                  for (const error of errors) {
+                    const violation = {
+                      file: fileName,
+                      line: parseInt(error.$.line),
+                      column: error.$.column ? parseInt(error.$.column) : null,
+                      severity: error.$.severity,
+                      message: error.$.message.replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'),
+                      source: error.$.source,
+                      reportFile: reportFile
+                    };
 
-                    // Normalize the file path to be relative to the repository root
-                    const repoPath = fileName.replace(/^.*\/src\//, 'src/');
-                    console.log(`Normalized file path: ${repoPath}`);
+                    allViolations.push(violation);
+                    totalViolations++;
 
-                    for (const error of file.error) {
-                      const lineNum = parseInt(error.$.line, 10);
-                      const message = error.$.message;
-                      const severity = error.$.severity;
-                      const source = error.$.source;
-
-                      console.log(`Found violation: ${severity} at line ${lineNum}: ${message}`);
-
-                      // Create the comment body
-                      const body = `:warning: **Checkstyle ${severity}**\n${message}\n\nSource: \`${source}\``;
-
-                      try {
-                        console.log(`Attempting to create comment for ${repoPath}:${lineNum}`);
-                        console.log(`Comment body: ${body}`);
-
-                        const response = await github.rest.pulls.createReviewComment({
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                          pull_number: context.issue.number,
-                          body: body,
-                          path: repoPath,
-                          line: lineNum,
-                          side: 'RIGHT',
-                          commit_id: prSha
-                        });
-
-                        console.log(`Comment created successfully. Response status: ${response.status}`);
-                        violationsCount++;
-                      } catch (commentError) {
-                        console.error(`Failed to create comment for ${repoPath}:${lineNum}`);
-                        console.error(`Error: ${commentError.message}`);
-                        console.error(commentError.stack);
-
-                        // If it fails with a specific error indicating the file/line isn't in the PR,
-                        // we can try a fallback approach with a general PR comment
-                        if (commentError.status === 422) {
-                          console.log('File or line might not be part of the PR. Skipping this violation.');
-                        }
-                      }
-                    }
+                    console.log(`  📍 Line ${violation.line}${violation.column ? `, Column ${violation.column}` : ''}: ${violation.message}`);
                   }
-                } catch (error) {
-                  console.error(`Error processing report ${reportPath}: ${error.message}`);
-                  console.error(error.stack);
                 }
-              }
 
-              // Add a summary comment
-              if (violationsCount > 0) {
-                try {
-                  await github.rest.issues.createComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: context.issue.number,
-                    body: `:clipboard: Checkstyle found ${violationsCount} style violation(s) in this PR.`
-                  });
-                  console.log(`Created summary comment for ${violationsCount} violations`);
-                } catch (error) {
-                  console.error(`Failed to create summary comment: ${error.message}`);
-                }
-              } else {
-                console.log('No style violations found to comment on.');
+              } catch (error) {
+                console.error(`❌ Error processing ${reportFile}:`, error);
               }
             }
 
-            run().catch(error => {
-              console.error('Unhandled error in the script:');
-              console.error(error.message);
-              console.error(error.stack);
-              process.exit(1);
+            console.log(`\n📊 Summary: Found ${totalViolations} total violations across all files`);
+
+            if (totalViolations === 0) {
+              console.log('🎉 No checkstyle violations found!');
+              return;
+            }
+
+            // 按文件分组违规
+            const violationsByFile = {};
+            allViolations.forEach(violation => {
+              if (!violationsByFile[violation.file]) {
+                violationsByFile[violation.file] = [];
+              }
+              violationsByFile[violation.file].push(violation);
             });
+
+            console.log(`\n📁 Violations grouped by ${Object.keys(violationsByFile).length} files`);
+
+            // 为每个文件的每个违规创建评论
+            let commentCount = 0;
+            const maxComments = 20; // 限制评论数量避免spam
+
+            for (const [filePath, violations] of Object.entries(violationsByFile)) {
+              console.log(`\n💬 Processing comments for: ${filePath}`);
+
+              // 转换绝对路径为相对路径
+              const relativePath = filePath.replace(process.cwd() + '/', '').replace(/^\/+/, '');
+              console.log(`📎 Relative path: ${relativePath}`);
+              console.log(`📎 Current working directory: ${process.cwd()}`);
+
+              for (const violation of violations) {
+                if (commentCount >= maxComments) {
+                  console.log(`⚠️ Reached maximum comment limit (${maxComments}), stopping...`);
+                  break;
+                }
+
+                const commentBody = `**Checkstyle ${violation.severity.toUpperCase()}**\n\n` +
+                  `${violation.message}\n\n` +
+                  `**Rule:** \`${violation.source.split('.').pop()}\`\n` +
+                  `**File:** ${violation.file}\n` +
+                  `**Line:** ${violation.line}${violation.column ? `, Column: ${violation.column}` : ''}\n` +
+                  `**Report:** ${path.basename(violation.reportFile)}`;
+
+                console.log(`\n📝 Creating comment for line ${violation.line}:`);
+                console.log(`   Message: ${violation.message}`);
+                console.log(`   Severity: ${violation.severity}`);
+                console.log(`   Path for API: ${relativePath}`);
+                console.log(`   Commit SHA: ${context.payload.pull_request.head.sha}`);
+
+                try {
+                  const response = await github.rest.pulls.createReviewComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.issue.number,
+                    body: commentBody,
+                    path: relativePath,
+                    line: violation.line,
+                    side: 'RIGHT',
+                    commit_id: context.payload.pull_request.head.sha
+                  });
+
+                  commentCount++;
+                  console.log(`✅ Comment created successfully (ID: ${response.data.id})`);
+
+                } catch (error) {
+                  console.error(`❌ Failed to create comment for ${relativePath}:${violation.line}:`, error.message);
+                  console.error(`   Error status: ${error.status}`);
+                  console.error(`   Error response:`, error.response?.data);
+
+                  // 如果是路径问题，尝试不同的路径格式
+                  if (error.status === 422) {
+                    console.log(`🔄 Trying alternative path formats...`);
+                    const altPaths = [
+                      filePath.replace(/^.*\/src\//, 'src/'),
+                      filePath.split('/').slice(-5).join('/'), // 取最后5个路径组件
+                      path.basename(filePath) // 只用文件名试试
+                    ];
+
+                    for (const altPath of altPaths) {
+                      console.log(`   Trying path: ${altPath}`);
+                      try {
+                        const altResponse = await github.rest.pulls.createReviewComment({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          pull_number: context.issue.number,
+                          body: commentBody,
+                          path: altPath,
+                          line: violation.line,
+                          side: 'RIGHT',
+                          commit_id: context.payload.pull_request.head.sha
+                        });
+                        console.log(`✅ Alternative path worked! (ID: ${altResponse.data.id})`);
+                        commentCount++;
+                        break;
+                      } catch (altError) {
+                        console.log(`   Alternative path failed: ${altError.message}`);
+                      }
+                    }
+                  }
+                }
+              }
+
+              if (commentCount >= maxComments) break;
+            }
+
+            // 创建总结评论
+            const summaryComment = `## 📋 Checkstyle Report Summary\n\n` +
+              `Found **${totalViolations}** checkstyle violations across **${Object.keys(violationsByFile).length}** files.\n\n` +
+              `${commentCount < totalViolations ? `⚠️ Showing first ${commentCount} violations (limited to avoid spam).\n\n` : ''}` +
+              `### Files with violations:\n` +
+              Object.entries(violationsByFile).map(([file, viols]) =>
+                `- \`${file}\`: ${viols.length} violation${viols.length > 1 ? 's' : ''}`
+              ).join('\n') + '\n\n' +
+              `### Severity breakdown:\n` +
+              (() => {
+                const severityCount = {};
+                allViolations.forEach(v => {
+                  severityCount[v.severity] = (severityCount[v.severity] || 0) + 1;
+                });
+                return Object.entries(severityCount).map(([sev, count]) =>
+                  `- ${sev.toUpperCase()}: ${count}`
+                ).join('\n');
+              })() + '\n\n' +
+              `### Report files processed:\n` +
+              reportFiles.map(file => `- \`${path.basename(file)}\``).join('\n') + '\n\n' +
+              `*Generated by Checkstyle GitHub Action*`;
+
+            console.log(`\n📄 Creating summary comment...`);
+            console.log(`Summary preview:\n${summaryComment.substring(0, 200)}...`);
+
+            try {
+              const summaryResponse = await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: summaryComment
+              });
+
+              console.log(`✅ Summary comment created successfully (ID: ${summaryResponse.data.id})`);
+            } catch (error) {
+              console.error(`❌ Failed to create summary comment:`, error.message);
+              console.error(`   Error details:`, error);
+            }
+
+            console.log(`\n🎯 Process completed!`);
+            console.log(`📊 Final stats:`);
+            console.log(`   - Total violations: ${totalViolations}`);
+            console.log(`   - Files processed: ${Object.keys(violationsByFile).length}`);
+            console.log(`   - Comments created: ${commentCount}`);
+            console.log(`   - Report files: ${reportFiles.length}`);
+            console.log(`   - Working directory: ${process.cwd()}`);
+            console.log(`   - Repository: ${context.repo.owner}/${context.repo.repo}`);
+            console.log(`   - PR number: ${context.issue.number}`);
