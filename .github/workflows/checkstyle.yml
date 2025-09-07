@@ -25,138 +25,267 @@ jobs:
         run: ./gradlew checkstyleMain checkstyleTest
         continue-on-error: true
 
-      - name: Comment Checkstyle Results on PR
-        uses: actions/github-script@v7
+      - name: Parse Checkstyle Reports and Comment
+        uses: actions/github-script@v8
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
             const fs = require('fs');
             const path = require('path');
-            const { execSync } = require('child_process');
-            const { JSDOM } = require('jsdom');
+            const { DOMParser } = require('@xmldom/xmldom');
 
-            console.log('Starting Checkstyle Results Processing');
+            console.log('=== Starting Checkstyle Report Processing ===');
+            console.log('Context:', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pr: context.issue.number,
+              sha: context.payload.pull_request.head.sha
+            });
 
-            // Find all checkstyle XML files
-            let xmlFiles = [];
-            try {
-              const findResult = execSync("find . -path '*/build/reports/checkstyle/*.xml' -type f", { encoding: 'utf-8' });
-              xmlFiles = findResult
-                .trim()
-                .split('\n')
-                .filter(f => f);
-              console.log(`Found ${xmlFiles.length} checkstyle XML files`);
-            } catch (e) {
-              console.error('Error finding XML files:', e.message);
-              return;
-            }
+            // 查找所有 checkstyle XML 文件
+            function findCheckstyleFiles(dir) {
+              console.log(`Searching for checkstyle files in: ${dir}`);
+              const files = [];
 
-            if (xmlFiles.length === 0) {
-              console.log('No checkstyle XML files found');
-              return;
-            }
+              function traverse(currentPath) {
+                try {
+                  const items = fs.readdirSync(currentPath);
 
-            let hasErrors = false;
-            let totalErrors = 0;
-            let successfulComments = 0;
-            let failedComments = 0;
+                  for (const item of items) {
+                    const fullPath = path.join(currentPath, item);
+                    const stat = fs.statSync(fullPath);
 
-            for (const xmlFile of xmlFiles) {
-              console.log(`Processing: ${xmlFile}`);
-
-              if (!fs.existsSync(xmlFile)) {
-                console.log(`File does not exist: ${xmlFile}`);
-                continue;
-              }
-
-              const content = fs.readFileSync(xmlFile, 'utf-8');
-              const dom = new JSDOM(content, { contentType: 'text/xml' });
-              const document = dom.window.document;
-
-              // Get all file elements
-              const fileElements = document.querySelectorAll('file');
-
-              for (const fileElement of fileElements) {
-                const fullFileName = fileElement.getAttribute('name');
-                if (!fullFileName) continue;
-
-                // Make path relative to repository root
-                const fileName = fullFileName
-                  .replace(process.cwd() + '/', '')
-                  .replace(/^\//, '');
-
-                // Get all error elements within this file
-                const errorElements = fileElement.querySelectorAll('error');
-
-                if (errorElements.length > 0) {
-                  console.log(`  File: ${fileName} (${errorElements.length} errors)`);
-                }
-
-                for (const errorElement of errorElements) {
-                  const line = errorElement.getAttribute('line');
-                  const column = errorElement.getAttribute('column');
-                  const message = errorElement.getAttribute('message');
-                  const source = errorElement.getAttribute('source');
-                  const severity = errorElement.getAttribute('severity');
-
-                  if (!line || !message || !source) {
-                    console.log('    Skipping error due to missing attributes');
-                    continue;
-                  }
-
-                  hasErrors = true;
-                  totalErrors++;
-
-                  const lineNum = parseInt(line);
-
-                  // Extract just the check class name
-                  const checkName = source.split('.').pop();
-
-                  // Create the comment body
-                  const body = `⚠️ **[checkstyle]** <${checkName}> ${message}`;
-
-                  console.log(`    Line ${lineNum}: ${checkName}`);
-
-                  try {
-                    await github.rest.pulls.createReviewComment({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      pull_number: context.issue.number,
-                      body: body,
-                      path: fileName,
-                      line: lineNum,
-                      side: 'RIGHT',
-                      commit_id: context.payload.pull_request.head.sha
-                    });
-                    successfulComments++;
-                    console.log(`    ✓ Comment posted`);
-                  } catch (e) {
-                    failedComments++;
-                    console.log(`    ✗ Failed: ${e.message}`);
-
-                    // If line not in diff, post as general comment
-                    if (e.status === 422) {
-                      try {
-                        await github.rest.issues.createComment({
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                          issue_number: context.issue.number,
-                          body: `${body}\n\n📍 File: \`${fileName}\` Line: ${lineNum}`
-                        });
-                        console.log(`    ✓ Posted as PR comment`);
-                        successfulComments++;
-                        failedComments--;
-                      } catch (e2) {
-                        console.log(`    ✗ PR comment also failed: ${e2.message}`);
+                    if (stat.isDirectory()) {
+                      // 检查是否是 build/reports/checkstyle 目录
+                      if (fullPath.includes('build/reports/checkstyle')) {
+                        console.log(`Found checkstyle directory: ${fullPath}`);
+                        const xmlFiles = fs.readdirSync(fullPath)
+                          .filter(f => f.endsWith('.xml'))
+                          .map(f => path.join(fullPath, f));
+                        files.push(...xmlFiles);
+                        console.log(`Found XML files: ${xmlFiles}`);
+                      } else if (!item.startsWith('.') && item !== 'node_modules') {
+                        traverse(fullPath);
                       }
                     }
                   }
+                } catch (err) {
+                  console.log(`Error traversing ${currentPath}: ${err.message}`);
                 }
               }
+
+              traverse(dir);
+              return files;
             }
 
-            console.log(`\nSummary: ${totalErrors} errors, ${successfulComments} posted, ${failedComments} failed`);
+            // 解析 XML 文件
+            function parseCheckstyleXML(xmlContent, xmlFile) {
+              console.log(`\nParsing XML file: ${xmlFile}`);
+              console.log(`XML content length: ${xmlContent.length} chars`);
 
-            if (hasErrors) {
-              core.setFailed(`Checkstyle found ${totalErrors} violation(s)`);
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(xmlContent, 'text/xml');
+              const violations = [];
+
+              const fileNodes = doc.getElementsByTagName('file');
+              console.log(`Found ${fileNodes.length} file nodes`);
+
+              for (let i = 0; i < fileNodes.length; i++) {
+                const fileNode = fileNodes[i];
+                const fileName = fileNode.getAttribute('name');
+                console.log(`  Processing file: ${fileName}`);
+
+                // 转换为相对路径
+                let relativePath = fileName;
+                if (fileName.startsWith('/')) {
+                  // 尝试提取相对路径
+                  const srcIndex = fileName.indexOf('src/');
+                  if (srcIndex !== -1) {
+                    relativePath = fileName.substring(srcIndex);
+                  }
+                } else if (fileName.includes('/src/')) {
+                  const srcIndex = fileName.indexOf('src/');
+                  relativePath = fileName.substring(srcIndex);
+                }
+
+                console.log(`    Relative path: ${relativePath}`);
+
+                const errorNodes = fileNode.getElementsByTagName('error');
+                console.log(`    Found ${errorNodes.length} errors`);
+
+                for (let j = 0; j < errorNodes.length; j++) {
+                  const error = errorNodes[j];
+                  const violation = {
+                    file: relativePath,
+                    line: parseInt(error.getAttribute('line') || '1'),
+                    column: error.getAttribute('column') ? parseInt(error.getAttribute('column')) : null,
+                    severity: error.getAttribute('severity'),
+                    message: error.getAttribute('message'),
+                    source: error.getAttribute('source')
+                  };
+
+                  console.log(`    Violation: Line ${violation.line}, Severity: ${violation.severity}`);
+                  violations.push(violation);
+                }
+              }
+
+              return violations;
             }
+
+            // 创建评论内容
+            function createCommentBody(violations) {
+              const parts = [];
+
+              // 添加图标
+              const icon = violations.some(v => v.severity === 'error') ? '❌' : '⚠️';
+
+              parts.push(`${icon} **Checkstyle Violation**\n`);
+
+              // 按严重程度分组
+              for (const violation of violations) {
+                const severityIcon = violation.severity === 'error' ? '🔴' : '🟡';
+                parts.push(`${severityIcon} **${violation.severity.toUpperCase()}**`);
+
+                if (violation.column) {
+                  parts.push(`Line ${violation.line}, Column ${violation.column}`);
+                } else {
+                  parts.push(`Line ${violation.line}`);
+                }
+
+                parts.push(`\n${violation.message}`);
+
+                if (violation.source) {
+                  const ruleName = violation.source.split('.').pop();
+                  parts.push(`\n_Rule: ${ruleName}_`);
+                }
+              }
+
+              return parts.join('\n');
+            }
+
+            // 主处理逻辑
+            try {
+              const checkstyleFiles = findCheckstyleFiles('.');
+
+              if (checkstyleFiles.length === 0) {
+                console.log('No checkstyle XML files found');
+                return;
+              }
+
+              console.log(`\nFound ${checkstyleFiles.length} checkstyle files total`);
+
+              // 收集所有违规
+              const allViolations = [];
+
+              for (const xmlFile of checkstyleFiles) {
+                console.log(`\nReading file: ${xmlFile}`);
+                try {
+                  const xmlContent = fs.readFileSync(xmlFile, 'utf8');
+                  const violations = parseCheckstyleXML(xmlContent, xmlFile);
+                  allViolations.push(...violations);
+                } catch (err) {
+                  console.error(`Error processing ${xmlFile}: ${err.message}`);
+                }
+              }
+
+              console.log(`\n=== Total violations found: ${allViolations.length} ===`);
+
+              if (allViolations.length === 0) {
+                console.log('No violations to report');
+                return;
+              }
+
+              // 按文件和行号分组违规
+              const violationsByLocation = {};
+
+              for (const violation of allViolations) {
+                const key = `${violation.file}:${violation.line}`;
+                if (!violationsByLocation[key]) {
+                  violationsByLocation[key] = {
+                    file: violation.file,
+                    line: violation.line,
+                    violations: []
+                  };
+                }
+                violationsByLocation[key].violations.push(violation);
+              }
+
+              console.log(`\nGrouped into ${Object.keys(violationsByLocation).length} unique locations`);
+
+              // 获取已存在的评论以避免重复
+              console.log('\nFetching existing comments...');
+              const existingComments = await github.rest.pulls.listReviewComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number
+              });
+
+              console.log(`Found ${existingComments.data.length} existing comments`);
+
+              // 创建评论
+              let successCount = 0;
+              let skipCount = 0;
+              let errorCount = 0;
+
+              for (const [key, location] of Object.entries(violationsByLocation)) {
+                console.log(`\nProcessing location: ${key}`);
+
+                // 检查是否已有评论在相同位置
+                const existingComment = existingComments.data.find(c =>
+                  c.path === location.file &&
+                  c.line === location.line &&
+                  c.body.includes('Checkstyle Violation')
+                );
+
+                if (existingComment) {
+                  console.log(`  Skipping - comment already exists at ${location.file}:${location.line}`);
+                  skipCount++;
+                  continue;
+                }
+
+                const body = createCommentBody(location.violations);
+                console.log(`  Creating comment for ${location.file}:${location.line}`);
+                console.log(`  Comment body length: ${body.length} chars`);
+
+                try {
+                  await github.rest.pulls.createReviewComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.issue.number,
+                    body: body,
+                    path: location.file,
+                    line: location.line,
+                    side: 'RIGHT',
+                    commit_id: context.payload.pull_request.head.sha
+                  });
+
+                  console.log(`  ✓ Comment created successfully`);
+                  successCount++;
+
+                  // 添加延迟以避免 API 限制
+                  await new Promise(resolve => setTimeout(resolve, 100));
+
+                } catch (err) {
+                  console.error(`  ✗ Failed to create comment: ${err.message}`);
+                  console.error(`    Error details:`, err);
+                  errorCount++;
+                }
+              }
+
+              console.log('\n=== Summary ===');
+              console.log(`Total violations: ${allViolations.length}`);
+              console.log(`Unique locations: ${Object.keys(violationsByLocation).length}`);
+              console.log(`Comments created: ${successCount}`);
+              console.log(`Comments skipped (already exist): ${skipCount}`);
+              console.log(`Errors: ${errorCount}`);
+
+              // 如果有错误，让 action 失败
+              if (errorCount > 0 && successCount === 0) {
+                core.setFailed(`Failed to create any comments. ${errorCount} errors occurred.`);
+              }
+
+            } catch (error) {
+              console.error('Fatal error:', error);
+              core.setFailed(error.message);
+            }
+
