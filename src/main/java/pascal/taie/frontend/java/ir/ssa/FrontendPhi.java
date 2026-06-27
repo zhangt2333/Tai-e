@@ -24,20 +24,21 @@ package pascal.taie.frontend.java.ir.ssa;
 
 import pascal.taie.ir.exp.Var;
 import pascal.taie.ir.stmt.AssignStmt;
+import pascal.taie.ir.stmt.Phi;
 import pascal.taie.ir.stmt.StmtVisitor;
 
 /**
  * Representation of a phi statement in the front-end, e.g., a = phi(s1:b1, s2:b2).
  * <p>
  * This is used to represent the phi statement in the front-end, which is different from the
- * {@link pascal.taie.ir.stmt.PhiStmt} in output IR.
+ * {@link Phi} in output IR.
  * </p>
  */
-public class FrontendPhiStmt extends AssignStmt<Var, FrontendPhiExp> {
+public class FrontendPhi extends AssignStmt<Var, FrontendPhiExp> {
 
     private final Var base;
 
-    public FrontendPhiStmt(Var base, Var def, FrontendPhiExp phiExp) {
+    public FrontendPhi(Var base, Var def, FrontendPhiExp phiExp) {
         super(def, phiExp);
         this.base = base;
     }

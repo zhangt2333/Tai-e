@@ -69,7 +69,7 @@ import pascal.taie.ir.stmt.Goto;
 import pascal.taie.ir.stmt.If;
 import pascal.taie.ir.stmt.Monitor;
 import pascal.taie.ir.stmt.Nop;
-import pascal.taie.ir.stmt.PhiStmt;
+import pascal.taie.ir.stmt.Phi;
 import pascal.taie.ir.stmt.Return;
 import pascal.taie.ir.stmt.Stmt;
 import pascal.taie.ir.stmt.SwitchStmt;
@@ -193,7 +193,7 @@ public class VM {
                     throw new AppException(exception);
                 }
             }
-            if (!(exceptionTriggered || stmt instanceof PhiStmt || stmt instanceof Catch)) {
+            if (!(exceptionTriggered || stmt instanceof Phi || stmt instanceof Catch)) {
                 frame.setLastPC(pc);
             }
         }

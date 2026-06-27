@@ -113,7 +113,7 @@ public interface StmtVisitor<T> {
         return visitDefault(stmt);
     }
 
-    default T visit(PhiStmt stmt) {
+    default T visit(Phi stmt) {
         return visitDefault(stmt);
     }
 

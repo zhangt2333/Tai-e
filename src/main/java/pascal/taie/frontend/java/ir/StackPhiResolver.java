@@ -23,8 +23,8 @@
 package pascal.taie.frontend.java.ir;
 
 import org.objectweb.asm.tree.AbstractInsnNode;
+import pascal.taie.frontend.java.ir.ssa.FrontendPhi;
 import pascal.taie.frontend.java.ir.ssa.FrontendPhiExp;
-import pascal.taie.frontend.java.ir.ssa.FrontendPhiStmt;
 import pascal.taie.ir.exp.Exp;
 import pascal.taie.ir.exp.LValue;
 import pascal.taie.ir.exp.Var;
@@ -36,7 +36,7 @@ import java.util.List;
 import java.util.Stack;
 
 /**
- * Resolve {@link StackPhi}s into {@link FrontendPhiStmt}s (SSA mode) or explicit assignments (non-SSA mode).
+ * Resolve {@link StackPhi}s into {@link FrontendPhi}s (SSA mode) or explicit assignments (non-SSA mode).
  */
 class StackPhiResolver {
 
@@ -133,9 +133,9 @@ class StackPhiResolver {
             context.operandStack.liftToVar(item);
             phiExp.addUseAndCorrespondingBlocks(item.var(), context.cfg.getNormalPredOf(block, i));
         }
-        FrontendPhiStmt frontendPhiStmt = new FrontendPhiStmt(phi.getVar(), phi.getVar(), phiExp);
+        FrontendPhi frontendPhi = new FrontendPhi(phi.getVar(), phi.getVar(), phiExp);
         phi.setWriteOutVar(phi.getVar());
-        addToBlockHead(block, frontendPhiStmt);
+        addToBlockHead(block, frontendPhi);
         phi.resolved = true;
     }
 

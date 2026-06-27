@@ -23,7 +23,7 @@
 package pascal.taie.frontend.java.ir.typing;
 
 import pascal.taie.frontend.java.FrontendTypeSystem;
-import pascal.taie.frontend.java.ir.ssa.FrontendPhiStmt;
+import pascal.taie.frontend.java.ir.ssa.FrontendPhi;
 import pascal.taie.ir.exp.ArrayLengthExp;
 import pascal.taie.ir.exp.InstanceFieldAccess;
 import pascal.taie.ir.exp.InvokeDynamic;
@@ -216,7 +216,7 @@ final class GraphBuilder implements StmtVisitor<Void> {
 
     @Override
     public Void visitDefault(Stmt stmt) {
-        if (stmt instanceof FrontendPhiStmt phi) {
+        if (stmt instanceof FrontendPhi phi) {
             Var lValue = phi.getLValue();
             for (RValue v : phi.getRValue().getUses()) {
                 graph.addVarTypeFlow((Var) v, lValue, FlowKind.VAR_VAR);

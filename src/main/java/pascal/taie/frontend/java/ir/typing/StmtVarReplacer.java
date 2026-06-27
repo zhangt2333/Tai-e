@@ -23,7 +23,7 @@
 package pascal.taie.frontend.java.ir.typing;
 
 import pascal.taie.frontend.java.ir.IRUtils;
-import pascal.taie.frontend.java.ir.ssa.FrontendPhiStmt;
+import pascal.taie.frontend.java.ir.ssa.FrontendPhi;
 import pascal.taie.ir.exp.ArithmeticExp;
 import pascal.taie.ir.exp.ArrayAccess;
 import pascal.taie.ir.exp.ArrayLengthExp;
@@ -128,9 +128,9 @@ final class StmtVarReplacer {
 
             @Override
             public Stmt visitDefault(Stmt stmt) {
-                if (stmt instanceof FrontendPhiStmt phi) {
+                if (stmt instanceof FrontendPhi phi) {
                     assert useReplacements.isEmpty();
-                    return new FrontendPhiStmt(phi.getBase(), replaceDef(phi.getLValue()), phi.getRValue());
+                    return new FrontendPhi(phi.getBase(), replaceDef(phi.getLValue()), phi.getRValue());
                 } else if (stmt instanceof AssignStmt<?, ?> assign) {
                     removeOldStmtFromRel(stmt);
                     return IRUtils.newAssignStmt(method, replaceLValue(assign.getLValue()), replaceRValue(assign.getRValue()));

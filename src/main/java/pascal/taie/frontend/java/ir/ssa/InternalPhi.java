@@ -86,7 +86,7 @@ public class InternalPhi {
     /**
      * the frontend phi statement corresponding to this phi
      */
-    private FrontendPhiStmt frontendPhi;
+    private FrontendPhi frontendPhi;
 
     InternalPhi(SSATransform ssaTransform, int slot, BytecodeBlock block, int phiIndex) {
         this.ssaTransform = ssaTransform;
@@ -161,11 +161,11 @@ public class InternalPhi {
         return outPhis;
     }
 
-    public void setFrontendPhi(FrontendPhiStmt frontendPhi) {
+    public void setFrontendPhi(FrontendPhi frontendPhi) {
         this.frontendPhi = frontendPhi;
     }
 
-    public FrontendPhiStmt getFrontendPhi() {
+    public FrontendPhi getFrontendPhi() {
         return frontendPhi;
     }
 }

@@ -69,7 +69,7 @@ import pascal.taie.ir.stmt.Invoke;
 import pascal.taie.ir.stmt.LoadArray;
 import pascal.taie.ir.stmt.LoadField;
 import pascal.taie.ir.stmt.New;
-import pascal.taie.ir.stmt.PhiStmt;
+import pascal.taie.ir.stmt.Phi;
 import pascal.taie.ir.stmt.Stmt;
 import pascal.taie.ir.stmt.StmtVisitor;
 import pascal.taie.ir.stmt.StoreArray;
@@ -689,7 +689,7 @@ public class DefaultSolver implements Solver {
             }
 
             @Override
-            public Void visit(PhiStmt stmt) {
+            public Void visit(Phi stmt) {
                 PhiExp rvalue = stmt.getRValue();
                 if (propTypes.isAllowed(rvalue)) {
                     CSVar to = csManager.getCSVar(context, stmt.getLValue());

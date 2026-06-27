@@ -99,7 +99,7 @@ import pascal.taie.ir.stmt.LookupSwitch;
 import pascal.taie.ir.stmt.Monitor;
 import pascal.taie.ir.stmt.New;
 import pascal.taie.ir.stmt.Nop;
-import pascal.taie.ir.stmt.PhiStmt;
+import pascal.taie.ir.stmt.Phi;
 import pascal.taie.ir.stmt.Return;
 import pascal.taie.ir.stmt.Stmt;
 import pascal.taie.ir.stmt.StoreArray;
@@ -523,7 +523,7 @@ public class BytecodeEmitter {
                 Var rValue = copy.getRValue();
                 emitMayConstLoad(rValue, nodeList);
                 nodeList.add(emitStore(copy.getLValue()));
-            } else if (stmt instanceof PhiStmt) {
+            } else if (stmt instanceof Phi) {
                 throw new IllegalArgumentException("Phi statement is not supported");
             } else if (stmt instanceof LoadArray loadArray) {
                 nodeList.add(emitLoad(loadArray.getArrayAccess().getBase()));

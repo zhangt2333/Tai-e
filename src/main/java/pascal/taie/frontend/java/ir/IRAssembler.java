@@ -30,7 +30,7 @@ import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import pascal.taie.frontend.java.ir.ssa.FrontendPhiStmt;
+import pascal.taie.frontend.java.ir.ssa.FrontendPhi;
 import pascal.taie.ir.DefaultIR;
 import pascal.taie.ir.IR;
 import pascal.taie.ir.exp.PhiExp;
@@ -39,7 +39,7 @@ import pascal.taie.ir.proginfo.ExceptionEntry;
 import pascal.taie.ir.stmt.Catch;
 import pascal.taie.ir.stmt.Goto;
 import pascal.taie.ir.stmt.If;
-import pascal.taie.ir.stmt.PhiStmt;
+import pascal.taie.ir.stmt.Phi;
 import pascal.taie.ir.stmt.Return;
 import pascal.taie.ir.stmt.Stmt;
 import pascal.taie.ir.stmt.SwitchStmt;
@@ -55,7 +55,7 @@ import java.util.Set;
 
 /**
  * Assembles the final Tai-e IR.
- * It resolves jump targets, converts {@link FrontendPhiStmt} to the {@link PhiStmt}, and builds the exception table.
+ * It resolves jump targets, converts {@link FrontendPhi} to the {@link Phi}, and builds the exception table.
  */
 class IRAssembler {
     private static final Logger logger = LoggerFactory.getLogger(IRAssembler.class);
@@ -87,7 +87,7 @@ class IRAssembler {
      */
     private List<Stmt> completeStmts() {
         List<Stmt> stmts = new ArrayList<>(context.source.instructions.size());
-        List<FrontendPhiStmt> frontendPhiStmts = new ArrayList<>();
+        List<FrontendPhi> frontendPhis = new ArrayList<>();
         int now = 0;
         for (Pair<Var, Optional<Integer>> p : context.varManager.getIntConstVarCache()) {
             Var v = p.first();
@@ -104,8 +104,8 @@ class IRAssembler {
             List<Stmt> blockStmts = block.getStmts();
             if (!blockStmts.isEmpty()) {
                 for (Stmt t : blockStmts) {
-                    if (true && t instanceof FrontendPhiStmt p) {
-                        frontendPhiStmts.add(p);
+                    if (true && t instanceof FrontendPhi p) {
+                        frontendPhis.add(p);
                     }
                     t.setIndex(now++);
                     stmts.add(t);
@@ -116,11 +116,11 @@ class IRAssembler {
 
         FrontendPhiResolver resolver = new FrontendPhiResolver(context.cfg);
         // Make PhiStmts using stmt.index as the value source.
-        for (FrontendPhiStmt p : frontendPhiStmts) {
+        for (FrontendPhi p : frontendPhis) {
             int index = p.getIndex();
             Type type = p.getLValue().getType();
             PhiExp exp = new PhiExp(resolver.resolvePhi(p.getRValue()), type);
-            Stmt phiStmt = new PhiStmt(p.getLValue(), exp);
+            Stmt phiStmt = new Phi(p.getLValue(), exp);
             phiStmt.setIndex(index);
             phiStmt.setLineNumber(p.getLineNumber());
             stmts.set(index, phiStmt);

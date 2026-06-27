@@ -23,8 +23,8 @@
 package pascal.taie.frontend.java.ir;
 
 import org.objectweb.asm.tree.AbstractInsnNode;
+import pascal.taie.frontend.java.ir.ssa.FrontendPhi;
 import pascal.taie.frontend.java.ir.ssa.FrontendPhiExp;
-import pascal.taie.frontend.java.ir.ssa.FrontendPhiStmt;
 import pascal.taie.frontend.java.ir.ssa.SSATransform;
 import pascal.taie.ir.exp.Var;
 import pascal.taie.ir.stmt.Catch;
@@ -32,7 +32,7 @@ import pascal.taie.ir.stmt.Stmt;
 
 /**
  * Manages operations on local variable slots, resolving slot reuse through {@link SSATransform}.
- * It handles load/store operations and is responsible for generating {@link FrontendPhiStmt}.
+ * It handles load/store operations and is responsible for generating {@link FrontendPhi}.
  */
 final class SlotManager {
     /**
@@ -197,10 +197,10 @@ final class SlotManager {
             Var origin = context.varManager.getVar(phi.getSlot());
             FrontendPhiExp phiExp = new FrontendPhiExp();
             def2Var[phi.getPhiDUIndex()] = phiVar;
-            FrontendPhiStmt frontendPhiStmt = new FrontendPhiStmt(origin, phiVar, phiExp);
+            FrontendPhi frontendPhi = new FrontendPhi(origin, phiVar, phiExp);
             context.varManager.setNonSSA(phiVar);
-            context.stmtManager.associateStmt(firstInsn, frontendPhiStmt);
-            phi.setFrontendPhi(frontendPhiStmt);
+            context.stmtManager.associateStmt(firstInsn, frontendPhi);
+            phi.setFrontendPhi(frontendPhi);
         });
     }
 
@@ -217,7 +217,7 @@ final class SlotManager {
 
     private void addInDefsForSlotPhis(BytecodeBlock block) {
         ssaTransform.visitUsedInternalPhis(block, (phi) -> {
-            FrontendPhiStmt realPhi = phi.getFrontendPhi();
+            FrontendPhi realPhi = phi.getFrontendPhi();
             assert realPhi != null;
             FrontendPhiExp phiExp = realPhi.getRValue();
             for (int i = 0; i < phi.getInDefs().size(); ++i) {

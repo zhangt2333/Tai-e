@@ -82,7 +82,7 @@ import pascal.taie.ir.stmt.LookupSwitch;
 import pascal.taie.ir.stmt.Monitor;
 import pascal.taie.ir.stmt.New;
 import pascal.taie.ir.stmt.Nop;
-import pascal.taie.ir.stmt.PhiStmt;
+import pascal.taie.ir.stmt.Phi;
 import pascal.taie.ir.stmt.Return;
 import pascal.taie.ir.stmt.Stmt;
 import pascal.taie.ir.stmt.StoreArray;
@@ -892,7 +892,7 @@ class MethodIRBuilder extends AbstractStmtSwitch<Void> {
         PhiExp phiExp = new PhiExp(values.stream()
                 .map(var -> new Pair<>(PhiExp.METHOD_ENTRY, var))
                 .toList(), converter.convertType(rhs.getType()));
-        addStmt(new PhiStmt(getVar(lhs), phiExp));
+        addStmt(new Phi(getVar(lhs), phiExp));
     }
 
     @Override

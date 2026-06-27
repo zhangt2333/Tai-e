@@ -31,9 +31,9 @@ import pascal.taie.ir.exp.Var;
  * The phi statement is used in SSA form to represent the merging of multiple
  * control flow paths.
  */
-public class PhiStmt extends AssignStmt<Var, PhiExp> {
+public class Phi extends AssignStmt<Var, PhiExp> {
 
-    public PhiStmt(Var lvalue, PhiExp rvalue) {
+    public Phi(Var lvalue, PhiExp rvalue) {
         super(lvalue, rvalue);
     }
 
