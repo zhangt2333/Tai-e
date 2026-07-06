@@ -137,9 +137,8 @@ public class SignatureMatcher {
                 if (unit.equals(Pattern.NAME_WILDCARD)) {
                     regex.append(".*");
                 } else {
-                    ((Pattern.StringUnit) unit).content()
-                            .chars()
-                            .forEach(c -> regex.append((c != '.') ? (char) c : "\\."));
+                    regex.append(java.util.regex.Pattern.quote(
+                            ((Pattern.StringUnit) unit).content()));
                 }
             });
             regex.append('$');

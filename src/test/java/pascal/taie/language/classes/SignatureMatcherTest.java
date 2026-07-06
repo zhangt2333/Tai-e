@@ -50,6 +50,22 @@ public class SignatureMatcherTest {
     }
 
     @Test
+    void testRegexMetaCharactersInNonExactPattern() {
+        assertEquals(Set.of(),
+                matcher.getMethods("<com.example.X*: void foo(java.lang.String[])>"));
+
+        JMethod arraysCopyOf = hierarchy.getMethod(
+                "<java.util.Arrays: java.lang.Object[] copyOf(java.lang.Object[],int)>");
+        assertEquals(Set.of(arraysCopyOf),
+                matcher.getMethods("<java.util.Arrays: * copyOf(java.lang.Object[],int)>"));
+
+        JMethod mapEntryGetKey = hierarchy.getJREMethod(
+                "<java.util.Map$Entry: java.lang.Object getKey()>");
+        assertEquals(Set.of(mapEntryGetKey),
+                matcher.getMethods("<java.util.Map$*: java.lang.Object getKey()>"));
+    }
+
+    @Test
     // CHECKSTYLE:OFF
     void testGetClasses() {
         JClass e_x = hierarchy.getClass("com.example.X");
