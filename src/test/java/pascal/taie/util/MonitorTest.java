@@ -25,6 +25,7 @@ package pascal.taie.util;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Stream;
 
@@ -49,6 +50,18 @@ public class MonitorTest {
         assertSame(exception, thrown);
         assertTrue(waitUntilMonitorThreadStops(taskName),
                 "Monitor should stop its sampler thread when the task throws");
+    }
+
+    @Test
+    void runWithTimeoutThrowsWhenTaskTimesOut() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                Monitor.runWithTimeout(taskThatTimesOut(), 0));
+
+        assertTrue(exception.getMessage().contains("timed out"));
+    }
+
+    private static Runnable taskThatTimesOut() {
+        return () -> LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(10));
     }
 
     private static boolean waitUntilMonitorThreadStarts(String taskName) {

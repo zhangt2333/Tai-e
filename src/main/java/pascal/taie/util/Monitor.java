@@ -288,8 +288,8 @@ public class Monitor {
      * Runs a task with a given time budget.
      *
      * <p>Executes the task in a separate thread with a timeout. If the task does not
-     * complete within the specified time limit, the execution is terminated and the
-     * program exits with status code 1.
+     * complete within the specified time limit, the execution is cancelled and a
+     * runtime exception is thrown.
      *
      * @param task    the task to be executed
      * @param seconds the time budget in seconds
@@ -301,12 +301,17 @@ public class Monitor {
         try {
             handler.get(timeout.getSeconds(), TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            e.printStackTrace();
-            System.exit(1);
-        } catch (InterruptedException | ExecutionException e) {
-            e.printStackTrace();
+            handler.cancel(true);
+            throw new RuntimeException(
+                    "Task timed out after " + seconds + " seconds", e);
+        } catch (InterruptedException e) {
+            handler.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while waiting for task", e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException("Task failed", e.getCause());
         } finally {
-            executor.shutdown();
+            executor.shutdownNow();
         }
     }
 

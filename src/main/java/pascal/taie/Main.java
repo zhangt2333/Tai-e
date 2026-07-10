@@ -39,6 +39,7 @@ import pascal.taie.util.Monitor;
 import pascal.taie.util.RuntimeInfoLogger;
 import pascal.taie.util.collection.Lists;
 
+import javax.annotation.Nullable;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.util.List;
@@ -50,28 +51,32 @@ public class Main {
     public static void main(String... args) {
         Monitor.runAndCount(() -> {
             Options options = processArgs(args);
+            if (options == null) {
+                return;
+            }
             LoggerConfigs.setOutput(options.getOutputDir());
             RuntimeInfoLogger.logRuntimeInfo();
             Plan plan = processConfigs(options);
             if (plan.analyses().isEmpty()) {
                 logger.info("No analyses are specified");
-                System.exit(0);
+                return;
             }
             buildWorld(options);
             executePlan(plan);
+            LoggerConfigs.reconfigure();
         }, "Tai-e");
-        LoggerConfigs.reconfigure();
     }
 
     /**
-     * If the given options is empty or specify to print help information,
-     * then print help and exit immediately.
+     * Parses options from the given arguments. If the options are empty or
+     * specify to print help information, then print help and return null.
      */
+    @Nullable
     private static Options processArgs(String... args) {
         Options options = Options.parse(args);
         if (options.isPrintHelp() || args.length == 0) {
             options.printHelp();
-            System.exit(0);
+            return null;
         }
         return options;
     }
