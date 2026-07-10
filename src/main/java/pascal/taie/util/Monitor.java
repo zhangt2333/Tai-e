@@ -246,10 +246,12 @@ public class Monitor {
         logger.info("[{}] starts ...", taskName);
         Monitor monitor = new Monitor(taskName);
         monitor.start();
-        T result = task.get();
-        monitor.stop();
-        logger.atLevel(level).log("{}", monitor);
-        return result;
+        try {
+            return task.get();
+        } finally {
+            monitor.stop();
+            logger.atLevel(level).log("{}", monitor);
+        }
     }
 
     /**

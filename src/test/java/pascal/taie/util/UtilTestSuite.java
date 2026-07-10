@@ -32,6 +32,7 @@ import pascal.taie.util.graph.GraphTestSuite;
         CollectionTestSuite.class,
         GraphTestSuite.class,
         IndexerTest.class,
+        MonitorTest.class,
 })
 public class UtilTestSuite {
 }
