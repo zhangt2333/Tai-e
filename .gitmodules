@@ -1,8 +1,8 @@
 [submodule "java-benchmarks"]
 	path = java-benchmarks
-	url = ../java-benchmarks.git
+	url = https://github.com/pascal-lab/java-benchmarks.git
 	branch = master
 [submodule "android-benchmarks"]
 	path = android-benchmarks
-	url = ../android-benchmarks.git
+	url = https://github.com/pascal-lab/android-benchmarks.git
 	branch = master
