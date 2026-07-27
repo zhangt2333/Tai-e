@@ -70,7 +70,7 @@ public abstract class Analysis {
             }
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new AnalysisException(String.format("Failed to get analysis ID of %s," +
-                    " please add public static field 'ID' in %s" +
+                    " please add public static field 'ID' to %s",
                     analysisClass, analysisClass));
         }
     }
