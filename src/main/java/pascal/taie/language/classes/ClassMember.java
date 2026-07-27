@@ -89,6 +89,10 @@ public abstract class ClassMember implements Annotated, Serializable {
         return Modifier.hasStatic(modifiers);
     }
 
+    public boolean isFinal() {
+        return Modifier.hasFinal(modifiers);
+    }
+
     public boolean isApplication() {
         return declaringClass.isApplication();
     }
