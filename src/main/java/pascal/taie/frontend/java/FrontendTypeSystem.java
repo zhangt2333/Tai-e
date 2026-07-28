@@ -81,7 +81,7 @@ public class FrontendTypeSystem extends FastTypeSystem {
     private transient Map<String, Pair<List<Type>, Type>> methodDescriptorCache
             = Maps.newConcurrentMap();
 
-    public FrontendTypeSystem(JClassLoader defaultClassLoader) {
+    FrontendTypeSystem(JClassLoader defaultClassLoader) {
         super(defaultClassLoader);
         arraySupers = Set.of(objectType, cloneableType, serializableType);
     }
@@ -98,7 +98,7 @@ public class FrontendTypeSystem extends FastTypeSystem {
      * Once the hierarchy is set, hierarchy-related APIs like {@link #isSubtype}
      * become fully functional.
      */
-    public void setHierarchy(ClassHierarchy hierarchy) {
+    void setHierarchy(ClassHierarchy hierarchy) {
         this.hierarchy = hierarchy;
     }
 
@@ -303,7 +303,7 @@ public class FrontendTypeSystem extends FastTypeSystem {
      * If the element type is already an array, the dimension is incremented by one.
      * For example: {@code String -> String[]}, {@code String[] -> String[][]}.
      */
-    public ArrayType makeArrayOf(ReferenceType elementType) {
+    private ArrayType makeArrayOf(ReferenceType elementType) {
         if (elementType instanceof ArrayType at) {
             return getArrayType(at.baseType(), at.dimensions() + 1);
         } else {
