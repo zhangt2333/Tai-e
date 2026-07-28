@@ -71,7 +71,7 @@ class TypeGSignatureBuilder extends SignatureVisitor {
         super(GSignatures.API);
     }
 
-    public TypeGSignature get() {
+    TypeGSignature get() {
         if (result == null) {
             State state = stack.pop();
             result = switch (state) {

@@ -41,7 +41,7 @@ final class MethodGSignatureBuilder extends TypeParameterAwareGSignatureBuilder 
 
     private final List<TypeGSignature> exceptionTypes = new ArrayList<>();
 
-    public MethodGSignature get() {
+    MethodGSignature get() {
         endExceptionType();
         endReturnType();
         if (gSig == null) {

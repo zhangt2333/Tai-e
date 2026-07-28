@@ -32,7 +32,7 @@ import java.util.Map;
 
 class IsNullFact extends MapFact<Var, IsNullValue> {
 
-    public IsNullFact() {
+    IsNullFact() {
         this(Collections.emptyMap());
     }
 
@@ -63,31 +63,31 @@ class IsNullFact extends MapFact<Var, IsNullValue> {
         return new IsNullFact(this.map);
     }
 
-    public IsNullConditionDecision getDecision() {
+    IsNullConditionDecision getDecision() {
         return decision;
     }
 
-    public void setDecision(IsNullConditionDecision decision) {
+    void setDecision(IsNullConditionDecision decision) {
         this.decision = decision;
     }
 
-    public void downgradeOnControlSplit() {
+    void downgradeOnControlSplit() {
         map.entrySet()
                 .stream()
                 .filter(entry -> entry.getValue().isNullOnSomePath())
                 .forEach(entry -> entry.setValue(IsNullValue.NCP));
     }
 
-    public void setInvalid() {
+    void setInvalid() {
         map.clear();
         isValid = false;
     }
 
-    public void setValid() {
+    void setValid() {
         isValid = true;
     }
 
-    public boolean isValid() {
+    boolean isValid() {
         return isValid;
     }
 }

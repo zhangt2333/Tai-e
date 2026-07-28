@@ -50,11 +50,11 @@ final class JClassLiteralObject extends JObject {
 
     final int dimensions;
 
-    public JClassLiteralObject(VM vm, JClass klass) {
+    JClassLiteralObject(VM vm, JClass klass) {
         this(vm, klass, 0);
     }
 
-    public JClassLiteralObject(VM vm, JClass klass, int dimensions) {
+    JClassLiteralObject(VM vm, JClass klass, int dimensions) {
         super(vm, vm.loadClass(Utils.fromJVMClass(Class.class)));
         this.klass = klass;
         this.dimensions = dimensions;

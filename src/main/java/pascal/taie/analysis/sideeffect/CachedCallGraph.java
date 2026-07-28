@@ -45,7 +45,7 @@ class CachedCallGraph<CallSite, Method> implements CallGraph<CallSite, Method> {
 
     private final CallGraph<CallSite, Method> delegate;
 
-    public CachedCallGraph(CallGraph<CallSite, Method> delegate) {
+    CachedCallGraph(CallGraph<CallSite, Method> delegate) {
         this.delegate = delegate;
     }
 

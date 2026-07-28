@@ -39,7 +39,7 @@ class IsNullConditionDecision {
 
     private final IsNullValue ifFalseDecision;
 
-    public IsNullConditionDecision(
+    IsNullConditionDecision(
             If stmt, Var varTested,
             IsNullValue ifTrueDecision, IsNullValue ifFalseDecision) {
         assert varTested.getType() instanceof ReferenceType;
@@ -50,20 +50,20 @@ class IsNullConditionDecision {
         this.ifFalseDecision = ifFalseDecision;
     }
 
-    public If getConditionStmt() {
+    If getConditionStmt() {
         return conditionStmt;
     }
 
-    public Var getVarTested() {
+    Var getVarTested() {
         return varTested;
     }
 
-    public boolean isEdgeFeasible(CFGEdge.Kind edgeKind) {
+    boolean isEdgeFeasible(CFGEdge.Kind edgeKind) {
         return getDecision(edgeKind) != null;
     }
 
     @CheckForNull
-    public IsNullValue getDecision(CFGEdge.Kind edgeKind) {
+    IsNullValue getDecision(CFGEdge.Kind edgeKind) {
         return switch (edgeKind) {
             case IF_TRUE -> ifTrueDecision;
             case IF_FALSE -> ifFalseDecision;

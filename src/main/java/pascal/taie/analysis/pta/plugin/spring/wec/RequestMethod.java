@@ -25,7 +25,7 @@ package pascal.taie.analysis.pta.plugin.spring.wec;
 /**
  * HTTP request methods
  */
-public enum RequestMethod {
+enum RequestMethod {
 
     GET,
 

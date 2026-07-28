@@ -267,7 +267,7 @@ class PFGBuilder {
         }
     }
 
-    public Set<FlowEdge> getOutEdgesOf(Node node) {
+    Set<FlowEdge> getOutEdgesOf(Node node) {
         Set<FlowEdge> outEdges = ofg.getOutEdgesOf(node);
         if (wuEdges.containsKey(node)) {
             outEdges = Sets.newSet(outEdges);

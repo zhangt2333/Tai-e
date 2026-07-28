@@ -75,27 +75,27 @@ enum IsNullValue {
         this.index = index;
     }
 
-    public boolean isDefinitelyNull() {
+    boolean isDefinitelyNull() {
         return this == CHECKED_NULL || this == NULL;
     }
 
-    public boolean isNullOnSomePath() {
+    boolean isNullOnSomePath() {
         return this == NSP;
     }
 
-    public boolean isAKaBoom() {
+    boolean isAKaBoom() {
         return this == NO_KABOOM_NN;
     }
 
-    public boolean isNullOnComplicatedPath() {
+    boolean isNullOnComplicatedPath() {
         return this == NCP || this == UNKNOWN;
     }
 
-    public boolean mightBeNull() {
+    boolean mightBeNull() {
         return isDefinitelyNull() || isNullOnSomePath();
     }
 
-    public boolean isDefinitelyNotNull() {
+    boolean isDefinitelyNotNull() {
         return this == NONNULL || this == CHECKED_NN || this == NO_KABOOM_NN;
     }
 
@@ -112,7 +112,7 @@ enum IsNullValue {
             {NULL, CHECKED_NULL, NONNULL, CHECKED_NN, NO_KABOOM_NN, NSP, UNKNOWN, NCP, UNDEF}
     };
 
-    public static IsNullValue merge(IsNullValue a, IsNullValue b) {
+    static IsNullValue merge(IsNullValue a, IsNullValue b) {
         int index1 = a.index;
         int index2 = b.index;
         if (index1 < index2) {

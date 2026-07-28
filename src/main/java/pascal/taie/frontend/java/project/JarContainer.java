@@ -44,7 +44,7 @@ class JarContainer extends ZipContainer {
     }
 
     @Nullable
-    public Manifest getManifest() {
+    Manifest getManifest() {
         return manifest;
     }
 }

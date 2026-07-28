@@ -43,7 +43,7 @@ import java.util.Set;
  */
 class StmtCFG extends AbstractCFG<Stmt> {
 
-    public StmtCFG(IR ir) {
+    StmtCFG(IR ir) {
         super(ir);
     }
 

@@ -124,7 +124,7 @@ public class Zipper {
      * @return a set of precision-critical methods that should be analyzed
      * context-sensitively.
      */
-    public Set<JMethod> selectPrecisionCriticalMethods() {
+    Set<JMethod> selectPrecisionCriticalMethods() {
         totalPFGNodes = new AtomicInteger(0);
         totalPFGEdges = new AtomicInteger(0);
         pcmMap = Maps.newConcurrentMap(1024);

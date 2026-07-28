@@ -140,7 +140,7 @@ public class AndroidObjManager {
         );
     }
 
-    public Obj mockAndroidSpecificObj(Var result, Invoke invoke) {
+    Obj mockAndroidSpecificObj(Var result, Invoke invoke) {
         return androidSpecificObjs.computeIfAbsent(result,
                 v -> heapModel.getMockObj(
                         ANDROID_SPECIFIC_DESC,

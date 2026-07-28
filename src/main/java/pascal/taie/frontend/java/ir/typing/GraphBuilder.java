@@ -66,7 +66,7 @@ final class GraphBuilder implements StmtVisitor<Void> {
     private final TypeFlowGraph graph;
     private final JMethod method;
 
-    public GraphBuilder(FrontendTypeSystem typeSystem, TypeFlowGraph graph, JMethod method) {
+    GraphBuilder(FrontendTypeSystem typeSystem, TypeFlowGraph graph, JMethod method) {
         this.typeSystem = typeSystem;
         this.graph = graph;
         this.method = method;

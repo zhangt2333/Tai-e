@@ -36,7 +36,7 @@ import pascal.taie.util.Hashes;
  *
  * @see AvailableExpression
  */
-public class ExpWrapper {
+class ExpWrapper {
 
     private final Exp exp;
 
@@ -44,7 +44,7 @@ public class ExpWrapper {
         this.exp = exp;
     }
 
-    public Exp get() {
+    Exp get() {
         return exp;
     }
 

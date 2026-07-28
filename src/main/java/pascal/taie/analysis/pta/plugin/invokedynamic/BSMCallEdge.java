@@ -31,7 +31,7 @@ import pascal.taie.analysis.pta.core.cs.element.CSMethod;
  */
 class BSMCallEdge extends OtherEdge<CSCallSite, CSMethod> {
 
-    public BSMCallEdge(CSCallSite csCallSite, CSMethod callee) {
+    BSMCallEdge(CSCallSite csCallSite, CSMethod callee) {
         super(csCallSite, callee);
     }
 }

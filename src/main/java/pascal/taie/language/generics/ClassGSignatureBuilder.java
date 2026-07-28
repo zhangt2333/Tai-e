@@ -41,11 +41,11 @@ final class ClassGSignatureBuilder extends TypeParameterAwareGSignatureBuilder {
 
     private final List<ClassTypeGSignature> interfaces = new ArrayList<>();
 
-    public ClassGSignatureBuilder(boolean isInterface) {
+    ClassGSignatureBuilder(boolean isInterface) {
         this.isInterface = isInterface;
     }
 
-    public ClassGSignature get() {
+    ClassGSignature get() {
         endInterface();
         endSuperClass();
         if (gSig == null) {

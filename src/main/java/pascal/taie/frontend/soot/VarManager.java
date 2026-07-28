@@ -76,7 +76,7 @@ class VarManager {
      */
     private int tempConstCounter = 0;
 
-    public VarManager(JMethod method, Converter converter) {
+    VarManager(JMethod method, Converter converter) {
         this.method = method;
         this.converter = converter;
     }

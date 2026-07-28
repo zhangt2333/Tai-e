@@ -65,7 +65,7 @@ public final class AndroidJavaVersionInfer {
         }
     }
 
-    public static int inferFromTargetSdk(int targetSdkVersion) {
+    static int inferFromTargetSdk(int targetSdkVersion) {
         return SDK_TO_JDK.getOrDefault(targetSdkVersion, DEFAULT_JAVA_VERSION);
     }
 }

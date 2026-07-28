@@ -64,7 +64,7 @@ public abstract class AbstractResultProcessor<S, D> {
         }
     }
 
-    public void dumpToFile(List<S> sources, File outputDir) {
+    void dumpToFile(List<S> sources, File outputDir) {
         List<D> dtos = sources.stream()
                 .map(this::convertToDto)
                 .sorted(Comparator.comparing(this::getSortKey))
