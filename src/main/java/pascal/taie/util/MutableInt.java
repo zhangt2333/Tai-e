@@ -24,8 +24,11 @@ package pascal.taie.util;
 
 /**
  * A mutable int wrapper.
+ * <p>
+ * This class is intended for single-threaded scenarios. For multi-threaded
+ * scenarios, use {@link java.util.concurrent.atomic.AtomicInteger} instead.
  */
-public class MutableInt extends Number implements Comparable<Number> {
+public class MutableInt extends Number {
 
     private int value;
 
@@ -67,27 +70,6 @@ public class MutableInt extends Number implements Comparable<Number> {
 
     @Override
     public double doubleValue() {
-        return value;
-    }
-
-    @Override
-    public int compareTo(Number number) {
-        return value - number.intValue();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof Number other)) {
-            return false;
-        }
-        return value == other.intValue();
-    }
-
-    @Override
-    public int hashCode() {
         return value;
     }
 
