@@ -34,6 +34,7 @@ import pascal.taie.analysis.pta.core.cs.context.ContextTest;
         ExceptionTest.class,
         LambdaTest.class,
         Java9StringConcatTest.class,
+        SignaturePolymorphicTest.class,
         ReflectionTest.class,
         TaintTest.class,
         WorldCacheTest.class,

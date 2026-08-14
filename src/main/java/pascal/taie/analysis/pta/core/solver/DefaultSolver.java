@@ -512,14 +512,28 @@ public class DefaultSolver implements Solver {
                 JMethod callee = csCallee.getMethod();
                 InvokeExp invokeExp = callSite.getInvokeExp();
                 // pass arguments to parameters
-                for (int i = 0; i < invokeExp.getArgCount(); ++i) {
-                    Var arg = invokeExp.getArg(i);
-                    if (propTypes.isAllowed(arg)) {
-                        Var param = callee.getIR().getParam(i);
-                        CSVar argVar = csManager.getCSVar(callerCtx, arg);
-                        CSVar paramVar = csManager.getCSVar(calleeCtx, param);
-                        addPFGEdge(argVar, paramVar, FlowKind.PARAMETER_PASSING);
+                int argCount = invokeExp.getArgCount();
+                int paramCount = callee.getParamCount();
+                if (argCount == paramCount) {
+                    for (int i = 0; i < argCount; ++i) {
+                        Var arg = invokeExp.getArg(i);
+                        if (propTypes.isAllowed(arg)) {
+                            Var param = callee.getIR().getParam(i);
+                            CSVar argVar = csManager.getCSVar(callerCtx, arg);
+                            CSVar paramVar = csManager.getCSVar(calleeCtx, param);
+                            addPFGEdge(argVar, paramVar, FlowKind.PARAMETER_PASSING);
+                        }
                     }
+                } else {
+                    // A call site to a signature-polymorphic method (JLS 15.12.3),
+                    // e.g., MethodHandle.linkToStatic, may have more arguments
+                    // than the declared parameters of the resolved method, which
+                    // declares a single varargs parameter (Object...). The declared
+                    // parameters are fictitious for such methods, thus we skip
+                    // parameter passing for these calls.
+                    logger.debug("Skip parameter passing from {} to {}:"
+                            + " {} arguments vs. {} parameters",
+                            callSite, callee, argCount, paramCount);
                 }
                 // pass results to LHS variable
                 Var lhs = callSite.getResult();
