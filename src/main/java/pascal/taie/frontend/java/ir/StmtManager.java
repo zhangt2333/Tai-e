@@ -23,6 +23,7 @@
 package pascal.taie.frontend.java.ir;
 
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.LineNumberNode;
 import pascal.taie.ir.stmt.Catch;
 import pascal.taie.ir.stmt.Nop;
 import pascal.taie.ir.stmt.Stmt;
@@ -50,11 +51,6 @@ final class StmtManager {
     private final List<List<Stmt>> additionalStmts;
 
     /**
-     * A <i>mutable</i> field that record current line number of visited bytecode
-     */
-    private int currentLineNumber;
-
-    /**
      * The shared context holding all resources and state for the IR building process.
      */
     private final IRBuilderContext context;
@@ -70,27 +66,24 @@ final class StmtManager {
         }
     }
 
-    /**
-     * Set line number.
-     */
-    void setLineNumber(int lineNumber) {
-        currentLineNumber = lineNumber;
-    }
-
-    /**
-     * Get line number.
-     */
-    int getLineNumber() {
-        return currentLineNumber;
+    int getLineNumber(AbstractInsnNode insn) {
+        while (insn.getOpcode() == -1 && insn.getNext() != null) {
+            insn = insn.getNext();
+        }
+        for (; insn != null; insn = insn.getPrevious()) {
+            if (insn instanceof LineNumberNode node) {
+                return node.line;
+            }
+        }
+        return -1;
     }
 
     /**
      * Associates a generated Stmt with its source bytecode instruction.
      */
     void associateStmt(AbstractInsnNode insn, Stmt stmt) {
-        // TODO: remove this checking
         if (stmt.getLineNumber() == -1) {
-            stmt.setLineNumber(currentLineNumber);
+            stmt.setLineNumber(getLineNumber(insn));
         }
         int idx = AsmInsnUtils.getInsnIndex(context.source, insn);
         if (insn2Stmt[idx] == null) {
@@ -148,7 +141,15 @@ final class StmtManager {
             }
         }
         if (blockEmpty) {
-            insn2Stmt[start + insns.size() - 1] = new Nop();
+            Nop nop = new Nop();
+            for (int i = insns.size() - 1; i >= 0; --i) {
+                AbstractInsnNode insn = insns.get(i);
+                if (insn.getOpcode() != -1) {
+                    nop.setLineNumber(getLineNumber(insn));
+                    break;
+                }
+            }
+            insn2Stmt[start + insns.size() - 1] = nop;
         }
     }
 

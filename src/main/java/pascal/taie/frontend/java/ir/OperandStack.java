@@ -256,7 +256,7 @@ final class OperandStack {
     void pushConst(AbstractInsnNode node, Literal literal) {
         if (context.varManager.isCachedInt(literal)) {
             // TODO: remove this line as toVar will handle it (and now it's more coupled). This will slightly change the const var name, which is reasonable.
-            pushExp(node, context.varManager.getCachedInt(literal));
+            pushExp(node, context.varManager.getCachedInt(literal, node));
         } else {
             pushExp(node, literal);
         }
@@ -302,7 +302,11 @@ final class OperandStack {
         } else {
             ensureStackSafety(e -> e == v || e.getUses().contains(v));
         }
-        return IRUtils.newAssignStmt(context.method, v, top.exp());
+        Stmt stmt = IRUtils.newAssignStmt(context.method, v, top.exp());
+        if (top.origin() != null && stmt instanceof Invoke) {
+            stmt.setLineNumber(context.stmtManager.getLineNumber(top.origin()));
+        }
+        return stmt;
     }
 
     /**
@@ -377,7 +381,7 @@ final class OperandStack {
             if (e instanceof NullLiteral) {
                 return context.varManager.getNullLiteral();
             } else if (context.varManager.isCachedInt(l)) {
-                return context.varManager.getCachedInt(l);
+                return context.varManager.getCachedInt(l, orig);
             } else {
                 v = context.varManager.getConstVar(l);
             }

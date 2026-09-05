@@ -147,8 +147,6 @@ final class BytecodeProcessor {
             insn = insnIter.next();
             if (insn instanceof FrameNode f) {
                 block.setFrame(f);
-            } else if (insn instanceof LineNumberNode l) {
-                context.stmtManager.setLineNumber(l.line);
             }
         }
         // now, insn must be:
@@ -257,7 +255,7 @@ final class BytecodeProcessor {
             if (jump.getOpcode() == Opcodes.GOTO) {
                 context.stmtManager.associateStmt(jump, new Goto());
             } else {
-                ConditionExp cond = getIfExp(jump.getOpcode());
+                ConditionExp cond = getIfExp(jump);
                 context.stmtManager.associateStmt(jump, new If(cond));
             }
         } else if (insn instanceof LdcInsnNode ldc) {
@@ -388,11 +386,11 @@ final class BytecodeProcessor {
         } else if (insn instanceof LookupSwitchInsnNode lookupSwitch) {
             Var v = context.operandStack.popVar();
             context.stmtManager.associateStmt(insn, new LookupSwitch(v, lookupSwitch.keys));
-        } else if (insn instanceof LabelNode || insn instanceof FrameNode) {
+        } else if (insn instanceof LabelNode
+                || insn instanceof FrameNode
+                || insn instanceof LineNumberNode) {
             // do nothing
             return;
-        } else if (insn instanceof LineNumberNode lineNumber) {
-            context.stmtManager.setLineNumber(lineNumber.line);
         } else {
             throw new UnsupportedOperationException();
         }
@@ -403,12 +401,13 @@ final class BytecodeProcessor {
         context.stmtManager.associateStmt(insn, new Throw(v));
     }
 
-    private ConditionExp getIfExp(int opcode) {
+    private ConditionExp getIfExp(JumpInsnNode jump) {
+        int opcode = jump.getOpcode();
         Var v1;
         Var v2;
         if (isInRange(opcode, Opcodes.IFEQ, Opcodes.IFLE)) {
             v1 = context.operandStack.popVar();
-            v2 = context.varManager.getCachedInt(IntLiteral.get(0));
+            v2 = context.varManager.getCachedIntForCondition(IntLiteral.get(0), jump);
         } else if (opcode == Opcodes.IFNULL || opcode == Opcodes.IFNONNULL) {
             v1 = context.operandStack.popVar();
             v2 = context.varManager.getNullLiteral();

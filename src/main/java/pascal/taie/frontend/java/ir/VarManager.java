@@ -97,6 +97,11 @@ public class VarManager {
     private final int[] intConstVarLineNumbers;
 
     /**
+     * Fallback line numbers for implicit zero operands used by conditional branches.
+     */
+    private final int[] implicitIntConstVarLineNumbers;
+
+    /**
      * Cache for the null literal variable.
      */
     private @Nullable Var nullLiteral;
@@ -163,7 +168,9 @@ public class VarManager {
         this.context = context;
         this.intConstVarCache = new Var[-INT_CACHE_LOW + 1 + INT_CACHE_HIGH];
         this.intConstVarLineNumbers = new int[-INT_CACHE_LOW + 1 + INT_CACHE_HIGH];
+        this.implicitIntConstVarLineNumbers = new int[-INT_CACHE_LOW + 1 + INT_CACHE_HIGH];
         Arrays.fill(intConstVarLineNumbers, UNDEFINED_LINE_NUMBER);
+        Arrays.fill(implicitIntConstVarLineNumbers, UNDEFINED_LINE_NUMBER);
         this.counter = 0;
         this.allVars = new ArrayList<>(context.source.maxLocals * 6);
         this.params = new ArrayList<>();
@@ -219,6 +226,9 @@ public class VarManager {
         for (int i = 0; i < this.intConstVarCache.length; i++) {
             Var v = this.intConstVarCache[i];
             int lineNumber = this.intConstVarLineNumbers[i];
+            if (lineNumber == UNDEFINED_LINE_NUMBER) {
+                lineNumber = this.implicitIntConstVarLineNumbers[i];
+            }
             Optional<Integer> lineNumberOpt = lineNumber == UNDEFINED_LINE_NUMBER || lineNumber == CONFLICT_LINE_NUMBER
                     ? Optional.empty()
                     : Optional.of(lineNumber);
@@ -249,7 +259,16 @@ public class VarManager {
                 && intLiteral.getValue() <= INT_CACHE_HIGH;
     }
 
-    Var getCachedInt(Literal literal) {
+    Var getCachedInt(Literal literal, @Nullable AbstractInsnNode origin) {
+        return getCachedInt(literal, origin, false);
+    }
+
+    Var getCachedIntForCondition(Literal literal, AbstractInsnNode origin) {
+        return getCachedInt(literal, origin, true);
+    }
+
+    private Var getCachedInt(Literal literal, @Nullable AbstractInsnNode origin,
+            boolean implicit) {
         assert isCachedInt(literal);
         IntLiteral intLiteral = (IntLiteral) literal;
         int index = intLiteral.getValue() - INT_CACHE_LOW;
@@ -257,11 +276,20 @@ public class VarManager {
             String name = getCachedIntName(intLiteral);
             intConstVarCache[index] = newConstVar(name, intLiteral);
         }
-        if (intConstVarLineNumbers[index] == UNDEFINED_LINE_NUMBER) {
-            intConstVarLineNumbers[index] = context.stmtManager.getLineNumber();
-        } else if (intConstVarLineNumbers[index] != context.stmtManager.getLineNumber()) {
-            // cache var defined more than once, so no line number
-            intConstVarLineNumbers[index] = CONFLICT_LINE_NUMBER;
+        if (origin != null) {
+            int lineNumber = context.stmtManager.getLineNumber(origin);
+            if (lineNumber != UNDEFINED_LINE_NUMBER) {
+                int[] lineNumbers = implicit
+                        ? implicitIntConstVarLineNumbers
+                        : intConstVarLineNumbers;
+                int cachedLineNumber = lineNumbers[index];
+                if (cachedLineNumber == UNDEFINED_LINE_NUMBER) {
+                    lineNumbers[index] = lineNumber;
+                } else if (cachedLineNumber != lineNumber) {
+                    // Cache var defined at different known lines, so no line number.
+                    lineNumbers[index] = CONFLICT_LINE_NUMBER;
+                }
+            }
         }
         return intConstVarCache[index];
     }
