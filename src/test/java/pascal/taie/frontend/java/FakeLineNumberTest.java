@@ -46,11 +46,12 @@ import java.util.List;
 
 import static pascal.taie.frontend.java.LineNumberAssertions.assertAllLines;
 import static pascal.taie.frontend.java.LineNumberAssertions.assertInferredCastLine;
-import static pascal.taie.frontend.java.LineNumberAssertions.assertStoreFieldLine;
+import static pascal.taie.frontend.java.LineNumberAssertions.assertInstanceFieldCastLine;
 import static pascal.taie.frontend.java.LineNumberAssertions.assertInvokeLine;
 import static pascal.taie.frontend.java.LineNumberAssertions.assertLiteralDefinitionLine;
 import static pascal.taie.frontend.java.LineNumberAssertions.assertReturnLine;
 import static pascal.taie.frontend.java.LineNumberAssertions.assertReturnLiteralLines;
+import static pascal.taie.frontend.java.LineNumberAssertions.assertStoreFieldLine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class FakeLineNumberTest {
@@ -128,6 +129,12 @@ public class FakeLineNumberTest {
         JMethod method = getFakeClass().getDeclaredMethod("conflictingConst");
         assertReturnLiteralLines(method, 0, List.of(81, 82));
         assertLiteralDefinitionLine(method, 0, -1);
+    }
+
+    @Test
+    void inferredInstanceFieldCastKeepsLine() throws IOException {
+        JMethod method = getFakeClass().getDeclaredMethod("phantomField");
+        assertInstanceFieldCastLine(method, "field", 90);
     }
 
     @Test
@@ -209,6 +216,7 @@ public class FakeLineNumberTest {
         addInferredCastMethods(classWriter);
         addPartialLineMethod(classWriter);
         addConflictingConstMethod(classWriter);
+        addPhantomFieldMethod(classWriter);
         addStackPhiMethod(classWriter);
         classWriter.visitEnd();
         return classWriter.toByteArray();
@@ -269,6 +277,27 @@ public class FakeLineNumberTest {
         method.visitInsn(Opcodes.ICONST_0);
         method.visitInsn(Opcodes.IRETURN);
         method.visitMaxs(1, 1);
+        method.visitEnd();
+    }
+
+    private static void addPhantomFieldMethod(ClassWriter classWriter) {
+        MethodVisitor method = classWriter.visitMethod(
+                Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
+                "phantomField", "()I", null, null);
+        method.visitCode();
+        Label line = new Label();
+        method.visitLabel(line);
+        method.visitLineNumber(90, line);
+        method.visitTypeInsn(Opcodes.NEW, "PhantomSub");
+        method.visitInsn(Opcodes.DUP);
+        method.visitMethodInsn(Opcodes.INVOKESPECIAL,
+                "PhantomSub", "<init>", "()V", false);
+        method.visitVarInsn(Opcodes.ASTORE, 0);
+        method.visitVarInsn(Opcodes.ALOAD, 0);
+        method.visitFieldInsn(Opcodes.GETFIELD,
+                "PhantomBase", "field", "I");
+        method.visitInsn(Opcodes.IRETURN);
+        method.visitMaxs(2, 1);
         method.visitEnd();
     }
 
